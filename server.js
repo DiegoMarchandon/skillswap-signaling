@@ -5,70 +5,41 @@
 import { Server } from "socket.io";
 import http from "http";
 
-// Servidor HTTP simple - TODO responde 200
+// Railway necesita respuestas en PUERTO 10000 o variable de entorno
+const PORT = process.env.PORT || 10000;
+
 const server = http.createServer((req, res) => {
-  // Railway necesita respuestas RÁPIDAS y consistentes
-  res.writeHead(200, {
+  console.log(`[HTTP] ${req.method} ${req.url}`);
+  
+  // Railway verifica que respondas en menos de 30 segundos
+  res.writeHead(200, { 
     'Content-Type': 'application/json',
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS'
+    'Access-Control-Allow-Origin': '*'
   });
   
-  // Todas las rutas responden lo mismo
-  const response = { 
+  res.end(JSON.stringify({ 
     status: "OK",
-    service: "WebRTC Signaling Server",
-    timestamp: new Date().toISOString(),
-    uptime: process.uptime()
-  };
-  
-  res.end(JSON.stringify(response));
+    service: "WebRTC Signaling",
+    port: PORT,
+    railway: true,
+    timestamp: new Date().toISOString()
+  }));
 });
 
-// Socket.IO
 const io = new Server(server, {
-  cors: {
-    origin: "*",
-    methods: ["GET", "POST"]
-  },
-  transports: ["websocket", "polling"],
-  // Configuración para evitar timeouts
-  pingTimeout: 60000,
-  pingInterval: 25000
+  cors: { origin: "*" },
+  transports: ["websocket", "polling"]
 });
 
-io.on("connection", (socket) => {
-  console.log("✅ Nuevo cliente conectado:", socket.id);
-
-  socket.on("offer", (data) => {
-    console.log("📨 Offer recibido de:", socket.id);
-    socket.broadcast.emit("offer", data);
-  });
-
-  socket.on("answer", (data) => {
-    console.log("📨 Answer recibido de:", socket.id);
-    socket.broadcast.emit("answer", data);
-  });
-
-  socket.on("ice-candidate", (data) => {
-    socket.broadcast.emit("ice-candidate", data);
-  });
-
-  socket.on("end-call", (data) => {
-    console.log("🔴 End-call recibido de:", socket.id);
-    socket.broadcast.emit("end-call", data);
-  });
-
-  socket.on("disconnect", (reason) => {
-    console.log("❌ Cliente desconectado:", socket.id, "razón:", reason);
-  });
-});
-
-// Railway siempre usa 8080
-const PORT = process.env.PORT || 8080;
+// ... tu código de eventos Socket.IO
 
 server.listen(PORT, "0.0.0.0", () => {
-  console.log(`✅ Servidor WebRTC corriendo en puerto ${PORT}`);
-  console.log(`🚀 Listo para conexiones WebSocket`);
-  console.log(`🌐 Health check: CUALQUIER ruta HTTP devuelve 200 OK`);
+  console.log(`✅ Server listening on 0.0.0.0:${PORT}`);
+  console.log(`📡 Ready for WebSocket connections`);
+  console.log(`🏗️ Railway URL: https://skillswap-signaling-production.up.railway.app`);
 });
+
+// Mantener el proceso vivo para Railway
+setInterval(() => {
+  console.log(`[${new Date().toISOString()}] Heartbeat - Server alive`);
+}, 30000);
