@@ -9,6 +9,14 @@ import express from "express";
 const app = express();
 const server = http.createServer(app);
 
+app.get("/", (req, res) => {
+  res.json({ 
+    message: "WebRTC Signaling Server",
+    status: "running",
+    health: "https://" + req.get('host') + "/health"
+  });
+});
+
 // Health check
 app.get("/health", (req, res) => {
   res.json({ status: "OK", service: "WebRTC Signaling Server" });
