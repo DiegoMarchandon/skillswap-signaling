@@ -15,9 +15,10 @@ app.set('trust proxy', 1);
 // Rutas de health check
 app.get("/", (req, res) => {
   res.json({ 
-    message: "WebRTC Signaling Server",
     status: "running",
-    timestamp: new Date().toISOString()
+    service: "WebRTC Signaling Server",
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime()
   });
 });
 
@@ -25,8 +26,13 @@ app.get("/health", (req, res) => {
   res.json({ 
     status: "OK", 
     timestamp: new Date().toISOString(),
-    service: "WebRTC Signaling Server"
+    socket_connections: io.engine?.clientsCount || 0
   });
+});
+
+// 🔴 IMPORTANTE: Railway necesita esta ruta específica
+app.get("/railway/health", (req, res) => {
+  res.status(200).send("OK");
 });
 
 // Configuración crucial para Railway
@@ -34,21 +40,9 @@ const io = new Server(server, {
   cors: {
     origin: "*",
     methods: ["GET", "POST"],
-    credentials: true
   },
   // Configuración para Railway/Heroku
-  transports: ["websocket", "polling"],
-  allowEIO3: true,
-  // Aumentar timeouts para Railway
-  pingTimeout: 60000,
-  pingInterval: 25000,
-  // Configuración de proxy
-  cookie: {
-    name: "io",
-    path: "/",
-    httpOnly: true,
-    sameSite: "lax"
-  }
+  transports: ["websocket", "polling"]
 });
 
 io.on("connection", (socket) => {
@@ -82,6 +76,5 @@ io.on("connection", (socket) => {
 const PORT = process.env.PORT || 4000;
 server.listen(PORT, "0.0.0.0", () => {
   console.log(`✅ Servidor WebRTC corriendo en puerto ${PORT}`);
-  console.log(`🌐 URL: https://skillswap-signaling.up.railway.app`);
-  console.log(`🩺 Health: https://skillswap-signaling.up.railway.app/health`);
+  console.log(`🌐 Health check: https://skillswap-signaling.up.railway.app/health`);
 });
