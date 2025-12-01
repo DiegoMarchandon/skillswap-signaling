@@ -9,26 +9,46 @@ import express from "express";
 const app = express();
 const server = http.createServer(app);
 
+// IMPORTANTE: Railway puede usar un proxy, necesitamos trust proxy
+app.set('trust proxy', 1);
+
+// Rutas de health check
 app.get("/", (req, res) => {
   res.json({ 
     message: "WebRTC Signaling Server",
     status: "running",
-    health: "https://" + req.get('host') + "/health"
+    timestamp: new Date().toISOString()
   });
 });
 
-// Health check
 app.get("/health", (req, res) => {
-  res.json({ status: "OK", service: "WebRTC Signaling Server" });
+  res.json({ 
+    status: "OK", 
+    timestamp: new Date().toISOString(),
+    service: "WebRTC Signaling Server"
+  });
 });
 
+// Configuración crucial para Railway
 const io = new Server(server, {
-  // 🔓 Para la demo: CORS abierto (si después querés, lo afinamos)
   cors: {
     origin: "*",
     methods: ["GET", "POST"],
+    credentials: true
   },
-  transports: ["websocket", "polling"], // igual que en el cliente
+  // Configuración para Railway/Heroku
+  transports: ["websocket", "polling"],
+  allowEIO3: true,
+  // Aumentar timeouts para Railway
+  pingTimeout: 60000,
+  pingInterval: 25000,
+  // Configuración de proxy
+  cookie: {
+    name: "io",
+    path: "/",
+    httpOnly: true,
+    sameSite: "lax"
+  }
 });
 
 io.on("connection", (socket) => {
@@ -54,12 +74,14 @@ io.on("connection", (socket) => {
     socket.broadcast.emit("end-call", data);
   });
 
-  socket.on("disconnect", () => {
-    console.log("❌ Cliente desconectado:", socket.id);
+  socket.on("disconnect", (reason) => {
+    console.log("❌ Cliente desconectado:", socket.id, " Razón: ",reason);
   });
 });
 
 const PORT = process.env.PORT || 4000;
 server.listen(PORT, "0.0.0.0", () => {
-  console.log(`✅ Servidor de signaling WebRTC corriendo en puerto ${PORT}`);
+  console.log(`✅ Servidor WebRTC corriendo en puerto ${PORT}`);
+  console.log(`🌐 URL: https://skillswap-signaling.up.railway.app`);
+  console.log(`🩺 Health: https://skillswap-signaling.up.railway.app/health`);
 });
