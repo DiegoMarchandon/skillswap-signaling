@@ -9,72 +9,58 @@ import express from "express";
 const app = express();
 const server = http.createServer(app);
 
-// IMPORTANTE: Railway puede usar un proxy, necesitamos trust proxy
-app.set('trust proxy', 1);
-
-// Rutas de health check
+// Rutas simples para probar que el server responde
 app.get("/", (req, res) => {
-  res.json({ 
-    status: "running",
-    service: "WebRTC Signaling Server",
-    timestamp: new Date().toISOString(),
-    uptime: process.uptime()
-  });
+  res.send("OK - WebRTC Signaling");
 });
 
 app.get("/health", (req, res) => {
-  res.json({ 
-    status: "OK", 
+  res.json({
+    status: "OK",
+    service: "WebRTC Signaling Server",
     timestamp: new Date().toISOString(),
-    socket_connections: io.engine?.clientsCount || 0
   });
 });
 
-// 🔴 IMPORTANTE: Railway necesita esta ruta específica
-app.get("/railway/health", (req, res) => {
-  res.status(200).send("OK");
-});
-
-// Configuración crucial para Railway
+// Socket.IO
 const io = new Server(server, {
   cors: {
-    origin: "*",
+    origin: "*",               // para la demo, abierto
     methods: ["GET", "POST"],
   },
-  // Configuración para Railway/Heroku
-  transports: ["websocket", "polling"]
+  transports: ["websocket", "polling"],
 });
 
 io.on("connection", (socket) => {
   console.log("✅ Nuevo cliente conectado:", socket.id);
 
   socket.on("offer", (data) => {
-    console.log("📨 Offer recibido, haciendo broadcast...");
+    console.log("📨 Offer recibido, haciendo broadcast…");
     socket.broadcast.emit("offer", data);
   });
 
   socket.on("answer", (data) => {
-    console.log("📨 Answer recibido, haciendo broadcast...");
+    console.log("📨 Answer recibido, haciendo broadcast…");
     socket.broadcast.emit("answer", data);
   });
 
   socket.on("ice-candidate", (data) => {
-    console.log("📨 ICE candidate recibido, reenviando...");
+    console.log("📨 ICE candidate recibido, reenviando…");
     socket.broadcast.emit("ice-candidate", data);
   });
 
   socket.on("end-call", (data) => {
-    console.log("🔴 End-call recibido, haciendo broadcast...", data);
+    console.log("🔴 End-call recibido, haciendo broadcast…", data);
     socket.broadcast.emit("end-call", data);
   });
 
   socket.on("disconnect", (reason) => {
-    console.log("❌ Cliente desconectado:", socket.id, " Razón: ",reason);
+    console.log("❌ Cliente desconectado:", socket.id, "razón:", reason);
   });
 });
 
+// Arranque
 const PORT = process.env.PORT || 4000;
 server.listen(PORT, "0.0.0.0", () => {
   console.log(`✅ Servidor WebRTC corriendo en puerto ${PORT}`);
-  console.log(`🌐 Health check: https://skillswap-signaling.up.railway.app/health`);
 });
