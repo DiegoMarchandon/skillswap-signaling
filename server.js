@@ -1,12 +1,11 @@
-/* Archivo Node.js para manejar el signaling de WebRTC */
 import { Server } from "socket.io";
 import http from "http";
 
-// Railway: usar PORT de entorno o 10000
+// Render usa el PORT que asigna automáticamente
 const PORT = process.env.PORT || 10000;
 
 const server = http.createServer((req, res) => {
-  console.log([`HTTP ${new Date().toISOString()}] ${req.method} ${req.url}`);
+  console.log(`[HTTP ${new Date().toISOString()}] ${req.method} ${req.url}`);
 
   try {
     res.writeHead(200, {
@@ -19,6 +18,7 @@ const server = http.createServer((req, res) => {
       status: "OK",
       service: "WebRTC Signaling",
       timestamp: new Date().toISOString(),
+      url: "https://skillswap-signaling.onrender.com"
     });
 
     res.end(response);
@@ -29,14 +29,13 @@ const server = http.createServer((req, res) => {
   }
 });
 
-// Manejar errores del servidor
 server.on("error", (error) => {
   console.error("Server error:", error);
 });
 
 const io = new Server(server, {
   cors: {
-    origin: "*", // si querés, después lo restringimos
+    origin: "*",
     methods: ["GET", "POST", "OPTIONS"],
   },
   transports: ["websocket", "polling"],
@@ -48,35 +47,23 @@ const io = new Server(server, {
 io.on("connection", (socket) => {
   console.log("✅ Nuevo cliente conectado:", socket.id);
 
-  // El cliente debe enviar meetingId apenas se conecta
-  socket.on("join", ({ meetingId }) => {
-    if (!meetingId) return;
-    socket.join(meetingId);
-    console.log(`👥 Cliente ${socket.id} unido a sala ${meetingId}`);
+  socket.on("offer", (data) => {
+    console.log("📨 Offer recibido de:", socket.id);
+    socket.broadcast.emit("offer", data);
   });
 
-  socket.on("offer", ({ offer, call_id, meetingId }) => {
-    if (!meetingId) return;
-    console.log(`📨 Offer recibido en sala ${meetingId}`);
-    socket.to(meetingId).emit("offer", { offer, call_id, meetingId });
+  socket.on("answer", (data) => {
+    console.log("📨 Answer recibido de:", socket.id);
+    socket.broadcast.emit("answer", data);
   });
 
-  socket.on("answer", ({ answer, call_id, meetingId }) => {
-    if (!meetingId) return;
-    console.log(`📨 Answer recibido en sala ${meetingId}`);
-    socket.to(meetingId).emit("answer", { answer, call_id, meetingId });
+  socket.on("ice-candidate", (data) => {
+    socket.broadcast.emit("ice-candidate", data);
   });
 
-  socket.on("ice-candidate", ({ candidate, meetingId }) => {
-    if (!meetingId) return;
-    console.log(`📨 ICE candidate recibido en sala ${meetingId}`);
-    socket.to(meetingId).emit("ice-candidate", { candidate, meetingId });
-  });
-
-  socket.on("end-call", ({ meetingId }) => {
-    if (!meetingId) return;
-    console.log(`🔴 End-call recibido en sala ${meetingId}`);
-    socket.to(meetingId).emit("end-call", { meetingId });
+  socket.on("end-call", (data) => {
+    console.log("🔴 End-call recibido de:", socket.id);
+    socket.broadcast.emit("end-call", data);
   });
 
   socket.on("disconnect", () => {
@@ -84,15 +71,12 @@ io.on("connection", (socket) => {
   });
 });
 
-// Levantar servidor
 server.listen(PORT, "0.0.0.0", () => {
   console.log(`✅ Server running on http://0.0.0.0:${PORT}`);
-  console.log(
-    "🌐 Railway URL: https://skillswap-signaling-production.up.railway.app"
-  );
+  console.log("🌐 Public URL: https://skillswap-signaling.onrender.com");
 });
 
-// Mantener el proceso vivo para Railway
+// Mantener el proceso vivo
 setInterval(() => {
-  console.log(`[${new Date().toISOString()}] Keep-alive heartbeat`);
-}, 15000);
+  console.log(`[${new Date().toISOString()}] Server alive`);
+}, 30000);
