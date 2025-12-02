@@ -1,94 +1,95 @@
 /* Archivo Node.js para manejar el signaling de WebRTC */
-/* servidor Socket.io independiente que escuchará en el puerto 4000 */
-
-/* Archivo Node.js para manejar el signaling de WebRTC */
 import { Server } from "socket.io";
 import http from "http";
 
-// Railway necesita respuestas en PUERTO 10000 o variable de entorno
-const PORT = 10000;
+// Railway: usar PORT de entorno o 10000
+const PORT = process.env.PORT || 10000;
 
 const server = http.createServer((req, res) => {
   console.log(`[HTTP ${new Date().toISOString()}] ${req.method} ${req.url}`);
-  
-  // 🔴 Railway necesita respuestas RÁPIDAS y en el formato correcto
+
   try {
-    res.writeHead(200, { 
-      'Content-Type': 'application/json',
-      'Access-Control-Allow-Origin': '*',
-      'Cache-Control': 'no-cache'
+    res.writeHead(200, {
+      "Content-Type": "application/json",
+      "Access-Control-Allow-Origin": "*",
+      "Cache-Control": "no-cache",
     });
-    
-    const response = JSON.stringify({ 
+
+    const response = JSON.stringify({
       status: "OK",
       service: "WebRTC Signaling",
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     });
-    
+
     res.end(response);
-    
   } catch (error) {
-    console.error('HTTP Error:', error);
+    console.error("HTTP Error:", error);
     res.writeHead(500);
-    res.end('Internal Server Error');
+    res.end("Internal Server Error");
   }
 });
 
-// 🔴 Manejar errores del servidor
-server.on('error', (error) => {
-  console.error('Server error:', error);
+// Manejar errores del servidor
+server.on("error", (error) => {
+  console.error("Server error:", error);
 });
 
 const io = new Server(server, {
-  cors: { 
-    origin: "*",
-    methods: ["GET", "POST", "OPTIONS"]
+  cors: {
+    origin: "*", // si querés, después lo restringimos
+    methods: ["GET", "POST", "OPTIONS"],
   },
   transports: ["websocket", "polling"],
-  // Configuración específica para Railway
   pingTimeout: 60000,
-  pingInterval: 25000
+  pingInterval: 25000,
 });
 
-// ... tu código de eventos Socket.IO
+// ====================== SOCKET.IO ======================
 io.on("connection", (socket) => {
   console.log("✅ Nuevo cliente conectado:", socket.id);
 
-  // 👉 El cliente debe enviar meeting_id inmediatamente
+  // El cliente debe enviar meetingId apenas se conecta
   socket.on("join", ({ meetingId }) => {
-    if (meetingId) {
-      socket.join(meetingId);
-      console.log(`👥 Cliente ${socket.id} unido a sala ${meetingId}`);
-    }
+    if (!meetingId) return;
+    socket.join(meetingId);
+    console.log(`👥 Cliente ${socket.id} unido a sala ${meetingId}`);
   });
 
   socket.on("offer", ({ offer, call_id, meetingId }) => {
-    console.log(`📨 Offer recibido en ${meetingId}`);
-    socket.to(meetingId).emit("offer", { offer, call_id });
+    if (!meetingId) return;
+    console.log(`📨 Offer recibido en sala ${meetingId}`);
+    socket.to(meetingId).emit("offer", { offer, call_id, meetingId });
   });
 
   socket.on("answer", ({ answer, call_id, meetingId }) => {
-    console.log(`📨 Answer recibido en ${meetingId}`);
-    socket.to(meetingId).emit("answer", { answer, call_id });
+    if (!meetingId) return;
+    console.log(`📨 Answer recibido en sala ${meetingId}`);
+    socket.to(meetingId).emit("answer", { answer, call_id, meetingId });
   });
 
   socket.on("ice-candidate", ({ candidate, meetingId }) => {
-    socket.to(meetingId).emit("ice-candidate", candidate);
+    if (!meetingId) return;
+    console.log(`📨 ICE candidate recibido en sala ${meetingId}`);
+    socket.to(meetingId).emit("ice-candidate", { candidate, meetingId });
   });
 
   socket.on("end-call", ({ meetingId }) => {
-    console.log(`🔴 End-call recibido en ${meetingId}`);
+    if (!meetingId) return;
+    console.log(`🔴 End-call recibido en sala ${meetingId}`);
     socket.to(meetingId).emit("end-call", { meetingId });
   });
 
   socket.on("disconnect", () => {
-    console.log("Cliente desconectado:", socket.id);
+    console.log("❌ Cliente desconectado:", socket.id);
   });
 });
 
+// Levantar servidor
 server.listen(PORT, "0.0.0.0", () => {
   console.log(`✅ Server running on http://0.0.0.0:${PORT}`);
-  console.log(`🌐 Railway URL: https://skillswap-signaling-production.up.railway.app`);
+  console.log(
+    "🌐 Railway URL: https://skillswap-signaling-production.up.railway.app"
+  );
 });
 
 // Mantener el proceso vivo para Railway
