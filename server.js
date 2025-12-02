@@ -6,7 +6,7 @@ import http from "http";
 const PORT = process.env.PORT || 10000;
 
 const server = http.createServer((req, res) => {
-  console.log(`[HTTP ${new Date().toISOString()}] ${req.method} ${req.url}`);
+  console.log([`HTTP ${new Date().toISOString()}] ${req.method} ${req.url}`);
 
   try {
     res.writeHead(200, {
