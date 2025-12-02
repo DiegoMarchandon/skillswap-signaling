@@ -54,26 +54,36 @@ const io = new Server(server, {
 io.on("connection", (socket) => {
   console.log("✅ Nuevo cliente conectado:", socket.id);
 
-  socket.on("offer", (data) => {
-    console.log("📨 Offer recibido, haciendo broadcast…");
-    socket.broadcast.emit("offer", data);
+  // 👉 El cliente debe enviar meeting_id inmediatamente
+  socket.on("join", ({ meetingId }) => {
+    if (meetingId) {
+      socket.join(meetingId);
+      console.log(`👥 Cliente ${socket.id} unido a sala ${meetingId}`);
+    }
   });
 
-  socket.on("answer", (data) => {
-    console.log("📨 Answer recibido, haciendo broadcast…");
-    socket.broadcast.emit("answer", data);
+  socket.on("offer", ({ offer, call_id, meetingId }) => {
+    console.log(`📨 Offer recibido en ${meetingId}`);
+    socket.to(meetingId).emit("offer", { offer, call_id });
   });
 
-  socket.on("ice-candidate", (data) => {
-    console.log("📨 ICE candidate recibido, reenviando…");
-    socket.broadcast.emit("ice-candidate", data);
+  socket.on("answer", ({ answer, call_id, meetingId }) => {
+    console.log(`📨 Answer recibido en ${meetingId}`);
+    socket.to(meetingId).emit("answer", { answer, call_id });
   });
 
-  socket.on("end-call", (data) => {
-    console.log("🔴 End-call recibido, de:", socket.id);
-    socket.broadcast.emit("end-call", data);
+  socket.on("ice-candidate", ({ candidate, meetingId }) => {
+    socket.to(meetingId).emit("ice-candidate", candidate);
   });
 
+  socket.on("end-call", ({ meetingId }) => {
+    console.log(`🔴 End-call recibido en ${meetingId}`);
+    socket.to(meetingId).emit("end-call", { meetingId });
+  });
+
+  socket.on("disconnect", () => {
+    console.log("Cliente desconectado:", socket.id);
+  });
 });
 
 server.listen(PORT, "0.0.0.0", () => {
